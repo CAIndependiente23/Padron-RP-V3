@@ -55,6 +55,7 @@
         }
 
         /* Información de Google Sheets */
+
         #popup-content table.sheet-info {
             border-collapse: collapse;
             width: 100%;
@@ -88,6 +89,19 @@
             padding: 10px;
             color: #a00;
         }
+
+        #popup-content .sheet-success {
+            padding: 10px;
+            color: #176b2c;
+        }
+
+        #popup-content .sheet-debug {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid #ddd;
+            font-size: 11px;
+            color: #777;
+        }
         </style>
 
         <title></title>
@@ -104,7 +118,11 @@
 
         </div>
 
-        <!-- Librerías originales de qgis2web -->
+
+        <!-- ========================================================= -->
+        <!-- LIBRERÍAS -->
+        <!-- ========================================================= -->
+
         <script src="resources/qgis2web_expressions.js"></script>
         <script src="./resources/functions.js"></script>
         <script src="./resources/ol.js"></script>
@@ -112,16 +130,25 @@
         <script src="resources/photon-geocoder-autocomplete.min.js"></script>
         <script src="resources/olms.js"></script>
 
-        <!-- Capa y estilos generados por QGIS2Web -->
+
+        <!-- ========================================================= -->
+        <!-- PAPAPARSE -->
+        <!-- IMPORTANTE: tiene que cargarse ANTES de usar Papa.parse -->
+        <!-- ========================================================= -->
+
+        <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.3/papaparse.min.js"></script>
+
+
+        <!-- ========================================================= -->
+        <!-- CAPA Y ESTILOS GENERADOS POR QGIS2WEB -->
+        <!-- ========================================================= -->
+
         <script src="layers/RPZ1_1.js"></script>
         <script src="styles/RPZ1_1_style.js"></script>
         <script src="./layers/layers.js" type="text/javascript"></script>
 
         <script src="./resources/Autolinker.min.js"></script>
         <script src="./resources/qgis2web.js"></script>
-
-        <!-- PapaParse: lectura segura del CSV de Google Sheets -->
-        <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.3/papaparse.min.js"></script>
 
 
         <!-- ========================================================= -->
@@ -131,45 +158,48 @@
         <script>
 
         /*
-         * Google Sheets
-         *
-         * Archivo:
-         * 1DFt05s339jwEDHBIZHh9UB_ULaU7RfQsgaMNnKqZKiM
-         *
-         * Pestaña:
-         * RP
-         *
-         * GID:
-         * 20565275
-         *
-         * Se leen las columnas A:W.
-         *
-         * La columna A se utiliza para relacionar:
-         *
-         *     Google Sheets - N° Reja
-         *              ↕
-         *     QGIS - campo "text"
+         * ============================================================
+         * CONFIGURACIÓN
+         * ============================================================
          */
 
         const SHEET_URL =
             'https://docs.google.com/spreadsheets/d/1DFt05s339jwEDHBIZHh9UB_ULaU7RfQsgaMNnKqZKiM/gviz/tq?tqx=out:csv&gid=20565275';
 
 
-        // Acá se almacenan los datos de la planilla
+        /*
+         * La planilla se lee completa de A:W.
+         *
+         * IMPORTANTE:
+         *
+         * La relación se hace EXCLUSIVAMENTE:
+         *
+         *       QGIS "text"
+         *             ↓
+         *       Google Sheets columna A
+         *
+         * El campo "fid" NO se utiliza.
+         */
+
+
         let datosPlanilla = [];
 
-        // Índice rápido:
-        // "numero de reja" -> fila de la planilla
         let indiceRejas = {};
 
 
         /*
-         * Normaliza los códigos para evitar problemas por:
+         * ============================================================
+         * NORMALIZACIÓN DEL CÓDIGO
+         * ============================================================
          *
-         * - mayúsculas/minúsculas
-         * - espacios al principio/final
-         * - pequeños problemas Unicode
+         * No modificamos el contenido del código.
+         *
+         * Solamente:
+         * - quitamos espacios al principio/final
+         * - unificamos Unicode
+         * - pasamos a mayúsculas
          */
+
         function normalizarCodigo(valor) {
 
             if (valor === null || valor === undefined) {
@@ -184,16 +214,62 @@
 
 
         /*
-         * Carga la planilla.
+         * ============================================================
+         * ESCAPE HTML
+         * ============================================================
+         *
+         * Evita que un contenido de Google Sheets pueda interpretarse
+         * como HTML dentro del popup.
          */
+
+        function escapeHtml(valor) {
+
+            if (valor === null || valor === undefined) {
+                return '';
+            }
+
+            return String(valor)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+
+        /*
+         * ============================================================
+         * CARGAR GOOGLE SHEETS
+         * ============================================================
+         */
+
         function cargarPlanilla() {
 
-            console.log('Cargando información desde Google Sheets...');
+            console.log(
+                'Cargando información desde Google Sheets...'
+            );
+
+
+            /*
+             * Comprobación de PapaParse
+             */
+
+            if (typeof Papa === 'undefined') {
+
+                console.error(
+                    'PapaParse no está cargado.'
+                );
+
+                return;
+            }
+
 
             fetch(SHEET_URL)
+
                 .then(function(response) {
 
                     if (!response.ok) {
+
                         throw new Error(
                             'No se pudo acceder a Google Sheets. Código HTTP: ' +
                             response.status
@@ -203,21 +279,25 @@
                     return response.text();
                 })
 
+
                 .then(function(csv) {
+
+                    console.log(
+                        'CSV de Google Sheets recibido.'
+                    );
+
 
                     Papa.parse(csv, {
 
-                        /*
-                         * NO usamos header:true porque queremos trabajar
-                         * directamente por posición de columna.
-                         */
                         header: false,
 
                         skipEmptyLines: true,
 
+
                         complete: function(resultado) {
 
                             const filas = resultado.data;
+
 
                             if (!filas || filas.length < 2) {
 
@@ -232,59 +312,80 @@
                             /*
                              * Primera fila = encabezados
                              */
+
                             const encabezados = filas[0];
 
 
                             /*
-                             * Desde la segunda fila están los datos.
+                             * Filas de datos.
                              *
-                             * Solamente tomamos A:W.
-                             *
-                             * A = índice 0
-                             * W = índice 22
+                             * Solamente A:W
                              */
-                            datosPlanilla = filas.slice(1).map(function(fila) {
 
-                                let objeto = {};
+                            datosPlanilla =
+                                filas.slice(1).map(function(fila) {
 
-                                for (let i = 0; i <= 22; i++) {
+                                    let objeto = {};
 
-                                    let nombreCampo =
-                                        encabezados[i] ||
-                                        'Columna ' + (i + 1);
 
-                                    objeto[nombreCampo] =
-                                        fila[i] !== undefined
-                                            ? fila[i]
+                                    for (let i = 0; i <= 22; i++) {
+
+                                        let nombreCampo =
+                                            encabezados[i] ||
+                                            'Columna ' + (i + 1);
+
+
+                                        objeto[nombreCampo] =
+                                            fila[i] !== undefined
+                                                ? fila[i]
+                                                : '';
+                                    }
+
+
+                                    /*
+                                     * IMPORTANTE:
+                                     *
+                                     * Guardamos explícitamente
+                                     * la columna A.
+                                     */
+
+                                    objeto.__codigo =
+                                        fila[0] !== undefined
+                                            ? fila[0]
                                             : '';
-                                }
 
-                                /*
-                                 * Guardamos también el valor de A
-                                 */
-                                objeto.__codigo =
-                                    fila[0] !== undefined
-                                        ? fila[0]
-                                        : '';
 
-                                return objeto;
-                            });
+                                    return objeto;
+
+                                });
 
 
                             /*
-                             * Creamos un índice.
+                             * =================================================
+                             * CREAR ÍNDICE
+                             * =================================================
                              *
-                             * Esto hace que buscar una reja sea
-                             * prácticamente instantáneo.
+                             * CLAVE:
+                             *
+                             * indiceRejas["12RP302"]
+                             *
+                             * devuelve la fila de Google Sheets cuyo
+                             * valor de columna A es "12RP302".
                              */
+
                             indiceRejas = {};
+
 
                             datosPlanilla.forEach(function(fila) {
 
                                 const codigo =
-                                    normalizarCodigo(fila.__codigo);
+                                    normalizarCodigo(
+                                        fila.__codigo
+                                    );
+
 
                                 if (codigo !== '') {
+
                                     indiceRejas[codigo] = fila;
                                 }
 
@@ -295,14 +396,29 @@
                                 'Google Sheets cargado correctamente.'
                             );
 
+
                             console.log(
                                 'Cantidad de filas:',
                                 datosPlanilla.length
                             );
 
+
                             console.log(
                                 'Cantidad de códigos indexados:',
                                 Object.keys(indiceRejas).length
+                            );
+
+
+                            /*
+                             * Prueba específica del código que estamos
+                             * utilizando.
+                             */
+
+                            console.log(
+                                'Prueba 12RP302:',
+                                indiceRejas[
+                                    normalizarCodigo('12RP302')
+                                ]
                             );
 
                         }
@@ -310,6 +426,7 @@
                     });
 
                 })
+
 
                 .catch(function(error) {
 
@@ -319,28 +436,37 @@
                     );
 
                 });
+
         }
 
 
         /*
-         * Busca una reja por su código.
+         * ============================================================
+         * BUSCAR REJA
+         * ============================================================
          */
+
         function buscarReja(codigo) {
 
             const codigoNormalizado =
                 normalizarCodigo(codigo);
+
 
             return indiceRejas[codigoNormalizado] || null;
         }
 
 
         /*
-         * Genera el contenido del popup.
+         * ============================================================
+         * MOSTRAR INFORMACIÓN
+         * ============================================================
          */
+
         function mostrarInformacionReja(codigo, fila) {
 
             const popupContent =
                 document.getElementById('popup-content');
+
 
             if (!popupContent) {
                 return;
@@ -348,77 +474,79 @@
 
 
             /*
-             * Si no encontramos la reja en la planilla
+             * --------------------------------------------------------
+             * NO ENCONTRADA
+             * --------------------------------------------------------
              */
+
             if (!fila) {
 
                 popupContent.innerHTML =
                     '<div class="sheet-error">' +
-                    '<strong>' + codigo + '</strong><br><br>' +
-                    'No se encontró información para esta reja en la planilla.' +
+
+                    '<strong>' +
+                    escapeHtml(codigo) +
+                    '</strong>' +
+
+                    '<br><br>' +
+
+                    'No se encontró información para esta reja ' +
+                    'en la planilla.' +
+
+                    '<div class="sheet-debug">' +
+                    'Búsqueda realizada en columna A.<br>' +
+                    'Campo utilizado del mapa: <strong>text</strong>.<br>' +
+                    'Código buscado: <strong>' +
+                    escapeHtml(codigo) +
+                    '</strong>' +
+                    '</div>' +
+
                     '</div>';
 
                 return;
             }
 
 
-            let html =
-                '<div class="sheet-title">' +
-                codigo +
+            /*
+             * --------------------------------------------------------
+             * ENCONTRADA
+             * --------------------------------------------------------
+             *
+             * Por ahora NO mostramos A:W.
+             *
+             * Solamente confirmamos que la relación funciona.
+             *
+             * Después podemos elegir exactamente qué columnas
+             * queremos mostrar.
+             */
+
+            popupContent.innerHTML =
+
+                '<div class="sheet-success">' +
+
+                    '<div class="sheet-title">' +
+                        '🔲 ' +
+                        escapeHtml(codigo) +
+                    '</div>' +
+
+                    '<strong>✓ Información encontrada</strong>' +
+
+                    '<div class="sheet-debug">' +
+                        'Coincidencia: campo <strong>text</strong> ' +
+                        'del mapa → columna <strong>A</strong> de la planilla.' +
+                    '</div>' +
+
                 '</div>';
 
-            html += '<table class="sheet-info">';
-
-
-            /*
-             * Mostramos A:W.
-             */
-            Object.keys(fila).forEach(function(campo) {
-
-                /*
-                 * No mostramos nuestro campo interno.
-                 */
-                if (campo === '__codigo') {
-                    return;
-                }
-
-                const valor = fila[campo];
-
-                /*
-                 * No mostramos columnas completamente vacías.
-                 */
-                if (
-                    valor === null ||
-                    valor === undefined ||
-                    String(valor).trim() === ''
-                ) {
-                    return;
-                }
-
-                html +=
-                    '<tr>' +
-                        '<td>' +
-                            campo +
-                        '</td>' +
-                        '<td>' +
-                            Autolinker.link(
-                                String(valor)
-                            ) +
-                        '</td>' +
-                    '</tr>';
-
-            });
-
-
-            html += '</table>';
-
-            popupContent.innerHTML = html;
         }
 
 
         /*
-         * Manejo del clic sobre las geometrías.
+         * ============================================================
+         * ACTIVAR CONSULTA DE PLANILLA
+         * ============================================================
          */
+
         function activarConsultaPlanilla() {
 
             if (typeof map === 'undefined') {
@@ -431,22 +559,33 @@
             }
 
 
+            console.log(
+                'Mapa encontrado. Activando consulta de Google Sheets.'
+            );
+
+
             map.on('singleclick', function(evt) {
 
                 let featureEncontrada = null;
 
 
                 /*
-                 * Busca una geometría debajo del cursor.
+                 * Buscar una geometría debajo del cursor.
                  */
+
                 map.forEachFeatureAtPixel(
+
                     evt.pixel,
+
                     function(feature, layer) {
 
+
                         /*
-                         * Solo nos interesa nuestra capa
-                         * de Rejas.
+                         * =================================================
+                         * SOLO NOS INTERESA LA CAPA DE REJAS
+                         * =================================================
                          */
+
                         if (
                             layer &&
                             layer.get('title') &&
@@ -462,17 +601,17 @@
 
 
                         /*
-                         * Si no podemos identificar la capa
-                         * por título, igualmente tomamos la
-                         * primera geometría encontrada.
+                         * Si no podemos identificar la capa por
+                         * título, tomamos la primera geometría.
                          */
+
                         if (!featureEncontrada) {
 
                             featureEncontrada = feature;
-
                         }
 
                     }
+
                 );
 
 
@@ -482,11 +621,36 @@
 
 
                 /*
-                 * El código de la reja está en "text".
+                 * =========================================================
+                 * MUY IMPORTANTE
+                 * =========================================================
+                 *
+                 * El código se obtiene EXCLUSIVAMENTE del campo:
+                 *
+                 *                    text
+                 *
+                 * NO utilizamos fid.
                  */
+
                 const codigo =
                     featureEncontrada.get('text');
 
+
+                console.log(
+                    'Campo text del elemento:',
+                    codigo
+                );
+
+
+                console.log(
+                    'Campo fid del elemento (NO UTILIZADO):',
+                    featureEncontrada.get('fid')
+                );
+
+
+                /*
+                 * Si no existe text
+                 */
 
                 if (
                     codigo === undefined ||
@@ -507,17 +671,32 @@
 
 
                 /*
-                 * Buscamos la fila correspondiente.
+                 * =========================================================
+                 * BUSCAR EN COLUMNA A
+                 * =========================================================
                  */
+
                 const fila =
                     buscarReja(codigoTexto);
 
 
+                console.log(
+                    'Código QGIS (text):',
+                    codigoTexto
+                );
+
+
+                console.log(
+                    '¿Encontrado en columna A?:',
+                    fila !== null
+                );
+
+
                 /*
-                 * Esperamos a que qgis2web termine de
-                 * mostrar su popup y luego reemplazamos
-                 * el contenido.
+                 * Esperamos unos milisegundos para que qgis2web
+                 * termine su propio popup.
                  */
+
                 setTimeout(function() {
 
                     mostrarInformacionReja(
@@ -525,29 +704,36 @@
                         fila
                     );
 
-                }, 20);
+                }, 50);
 
             });
 
 
             console.log(
-                'Consulta de Google Sheets activada.'
+                'Consulta de Google Sheets activada correctamente.'
             );
+
         }
+
+
+        /*
+         * ============================================================
+         * INICIO
+         * ============================================================
+         */
 
 
         /*
          * Primero cargamos la planilla.
          */
+
         cargarPlanilla();
 
 
         /*
-         * qgis2web ya creó el mapa antes de llegar acá.
-         *
-         * Esperamos un instante para asegurarnos de que
-         * "map" esté disponible.
+         * Esperamos a que qgis2web haya creado el mapa.
          */
+
         setTimeout(function() {
 
             activarConsultaPlanilla();
