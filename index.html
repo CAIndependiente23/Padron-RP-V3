@@ -256,19 +256,14 @@
 
     <script>
 
+
         /*
          * =====================================================
          * CONFIGURACIÓN DE PLANILLAS
          * =====================================================
          *
-         * ESTA ES LA ÚNICA PARTE QUE DEBERÍAS NECESITAR
-         * MODIFICAR CUANDO AGREGUES UNA NUEVA ZONA.
-         *
-         * Cada objeto representa una Google Sheet.
-         *
-         * id   = ID de la planilla
-         * gid  = ID de la pestaña
-         * zona = nombre que queremos identificar
+         * Para agregar otra zona en el futuro solamente
+         * agregamos otra entrada acá.
          *
          */
 
@@ -311,7 +306,6 @@
          * =====================================================
          */
 
-
         let datosPlanilla = {};
 
         let indiceRejas = {};
@@ -323,7 +317,6 @@
          * NORMALIZAR CÓDIGOS
          * =====================================================
          */
-
 
         function normalizarCodigo(valor) {
 
@@ -359,7 +352,6 @@
          * =====================================================
          */
 
-
         function escapeHtml(valor) {
 
             if (
@@ -393,7 +385,6 @@
          * PARSER CSV
          * =====================================================
          */
-
 
         function parseCSV(texto) {
 
@@ -527,7 +518,6 @@
          * =====================================================
          */
 
-
         async function cargarPlanilla(planilla) {
 
 
@@ -624,7 +614,6 @@
                  * BUSCAR AUTOMÁTICAMENTE LA FILA DE ENCABEZADOS
                  * =================================================
                  */
-
 
                 let filaEncabezados = -1;
 
@@ -740,7 +729,6 @@
                  * =================================================
                  */
 
-
                 const registros = [];
 
 
@@ -781,9 +769,8 @@
 
 
                     /*
-                     * A:W = 23 columnas
+                     * Conservamos A:W internamente.
                      */
-
 
                     for (
                         let j = 0;
@@ -811,6 +798,55 @@
                     }
 
 
+
+                    /*
+                     * =================================================
+                     * DATOS QUE APARECERÁN EN LA ETIQUETA
+                     * =================================================
+                     *
+                     * A = 0  → N° Reja
+                     * C = 2  → Comuna
+                     * E = 4  → Altura calle inicio
+                     * F = 5  → Altura calle fin
+                     * G = 6  → Calle
+                     * N = 13 → Longitud
+                     */
+
+                    registro.__etiqueta = {
+
+                        nroReja:
+                            fila[0] !== undefined
+                                ? fila[0]
+                                : "",
+
+                        comuna:
+                            fila[2] !== undefined
+                                ? fila[2]
+                                : "",
+
+                        alturaInicio:
+                            fila[4] !== undefined
+                                ? fila[4]
+                                : "",
+
+                        alturaFin:
+                            fila[5] !== undefined
+                                ? fila[5]
+                                : "",
+
+                        calle:
+                            fila[6] !== undefined
+                                ? fila[6]
+                                : "",
+
+                        longitud:
+                            fila[13] !== undefined
+                                ? fila[13]
+                                : ""
+
+                    };
+
+
                     registro.__codigo =
                         codigo;
 
@@ -831,7 +867,6 @@
                  * Guardar datos de esta zona
                  */
 
-
                 datosPlanilla[
                     planilla.zona
                 ] = registros;
@@ -843,7 +878,6 @@
                  * CREAR ÍNDICE GLOBAL
                  * =================================================
                  */
-
 
                 registros.forEach(
                     registro => {
@@ -861,11 +895,10 @@
 
 
                         /*
-                         * Si por alguna razón hubiera
-                         * códigos repetidos entre planillas,
-                         * conservamos el primero.
+                         * Si existiera el mismo código
+                         * en dos planillas, se conserva
+                         * el primero.
                          */
-
 
                         if (
                             !indiceRejas[codigo]
@@ -940,7 +973,6 @@
          * =====================================================
          */
 
-
         async function cargarTodasLasPlanillas() {
 
 
@@ -961,11 +993,6 @@
                 PLANILLAS.length
 
             );
-
-
-            /*
-             * Cargamos todas simultáneamente.
-             */
 
 
             const resultados =
@@ -1029,11 +1056,6 @@
             );
 
 
-            /*
-             * Pruebas conocidas
-             */
-
-
             console.log(
 
                 "Prueba 12RP302:",
@@ -1064,7 +1086,6 @@
                 "Google Sheets listo."
             );
 
-
         }
 
 
@@ -1074,7 +1095,6 @@
          * BUSCAR REJA
          * =====================================================
          */
-
 
         function buscarReja(codigo) {
 
@@ -1139,14 +1159,16 @@
          * MOSTRAR INFORMACIÓN
          * =====================================================
          *
-         * POR AHORA mostramos todos los campos con contenido.
+         * SOLAMENTE se muestran:
          *
-         * Cuando confirmemos que Z1/Z4/Z5 funcionan,
-         * reemplazamos esto por solamente los campos que
-         * quieras mostrar.
+         * A → N° Reja
+         * C → Comuna
+         * E → Altura calle inicio
+         * F → Altura calle fin
+         * G → Calle
+         * N → Longitud
          *
          */
-
 
         function mostrarInformacionReja(
             codigo,
@@ -1169,6 +1191,12 @@
 
 
 
+            /*
+             * =================================================
+             * SI NO SE ENCONTRÓ
+             * =================================================
+             */
+
             if (!datos) {
 
 
@@ -1184,9 +1212,7 @@
 
                     '<div class="popup-error">' +
 
-                    'No se encontró información para esta reja en las planillas.'
-
-                    +
+                    'No se encontró información para esta reja en las planillas.' +
 
                     '</div>' +
 
@@ -1211,84 +1237,231 @@
 
 
 
-            let html =
+            /*
+             * =================================================
+             * DATOS DE LA ETIQUETA
+             * =================================================
+             */
 
+            const etiqueta =
+                datos.__etiqueta || {};
+
+
+
+            /*
+             * =================================================
+             * TÍTULO
+             * =================================================
+             */
+
+            let html =
 
                 '<div class="popup-title">' +
 
                 '🔲 ' +
 
-                escapeHtml(codigo) +
-
-                '</div>' +
-
-
-                '<div class="popup-zone">' +
-
-                'Planilla: ' +
-
                 escapeHtml(
-                    datos.__zona
+
+                    etiqueta.nroReja ||
+
+                    codigo
+
                 ) +
 
                 '</div>';
 
 
 
-            Object.keys(datos).forEach(
-                campo => {
+            /*
+             * ZONA
+             */
+
+            html +=
+
+                '<div class="popup-zone">' +
+
+                escapeHtml(
+
+                    datos.__zona || ""
+
+                ) +
+
+                '</div>';
 
 
-                    /*
-                     * Estos campos son internos.
-                     */
+
+            /*
+             * =================================================
+             * COMUNA
+             * =================================================
+             */
+
+            if (
+
+                etiqueta.comuna !== undefined &&
+
+                String(
+                    etiqueta.comuna
+                ).trim() !== ""
+
+            ) {
 
 
-                    if (
-                        campo === "__codigo" ||
-                        campo === "__zona"
-                    ) {
+                html +=
 
-                        return;
+                    '<div class="popup-data-row">' +
 
-                    }
+                    '<strong>Comuna:</strong> ' +
 
+                    escapeHtml(
 
-                    const valor =
-                        datos[campo];
+                        etiqueta.comuna
 
+                    ) +
 
-                    if (
-                        valor === null ||
-                        valor === undefined ||
-                        String(valor).trim() === ""
-                    ) {
+                    '</div>';
 
-                        return;
-
-                    }
+            }
 
 
-                    html +=
 
-                        '<div class="popup-data-row">' +
+            /*
+             * =================================================
+             * CALLE
+             * =================================================
+             */
 
-                        '<strong>' +
+            if (
 
-                        escapeHtml(
-                            campo
-                        ) +
+                etiqueta.calle !== undefined &&
 
-                        ':</strong> ' +
+                String(
+                    etiqueta.calle
+                ).trim() !== ""
 
-                        escapeHtml(
-                            valor
-                        ) +
+            ) {
 
-                        '</div>';
 
-                }
-            );
+                html +=
+
+                    '<div class="popup-data-row">' +
+
+                    '<strong>Calle:</strong> ' +
+
+                    escapeHtml(
+
+                        etiqueta.calle
+
+                    ) +
+
+                    '</div>';
+
+            }
+
+
+
+            /*
+             * =================================================
+             * ALTURA CALLE INICIO
+             * =================================================
+             */
+
+            if (
+
+                etiqueta.alturaInicio !== undefined &&
+
+                String(
+                    etiqueta.alturaInicio
+                ).trim() !== ""
+
+            ) {
+
+
+                html +=
+
+                    '<div class="popup-data-row">' +
+
+                    '<strong>Altura inicio:</strong> ' +
+
+                    escapeHtml(
+
+                        etiqueta.alturaInicio
+
+                    ) +
+
+                    '</div>';
+
+            }
+
+
+
+            /*
+             * =================================================
+             * ALTURA CALLE FIN
+             * =================================================
+             */
+
+            if (
+
+                etiqueta.alturaFin !== undefined &&
+
+                String(
+                    etiqueta.alturaFin
+                ).trim() !== ""
+
+            ) {
+
+
+                html +=
+
+                    '<div class="popup-data-row">' +
+
+                    '<strong>Altura fin:</strong> ' +
+
+                    escapeHtml(
+
+                        etiqueta.alturaFin
+
+                    ) +
+
+                    '</div>';
+
+            }
+
+
+
+            /*
+             * =================================================
+             * LONGITUD
+             * =================================================
+             */
+
+            if (
+
+                etiqueta.longitud !== undefined &&
+
+                String(
+                    etiqueta.longitud
+                ).trim() !== ""
+
+            ) {
+
+
+                html +=
+
+                    '<div class="popup-data-row">' +
+
+                    '<strong>Longitud:</strong> ' +
+
+                    escapeHtml(
+
+                        etiqueta.longitud
+
+                    ) +
+
+                    '</div>';
+
+            }
 
 
 
@@ -1304,17 +1477,10 @@
          * ACTIVAR CLICK EN EL MAPA
          * =====================================================
          *
-         * IMPORTANTE:
-         *
-         * No especificamos Z1, Z4 o Z5 acá.
-         *
-         * Cualquier layer que tenga un campo "text"
-         * puede ser utilizado.
-         *
-         * Por eso esta parte queda ESTANDARIZADA.
+         * Cualquier layer que tenga el campo "text"
+         * puede utilizar esta misma función.
          *
          */
-
 
         function activarConsultaPlanilla() {
 
@@ -1377,12 +1543,9 @@
 
                             /*
                              * =================================================
-                             * CLAVE PRINCIPAL
+                             * UTILIZAMOS ÚNICAMENTE "text"
                              * =================================================
-                             *
-                             * SIEMPRE utilizamos "text".
                              */
-
 
                             const codigoText =
 
@@ -1449,10 +1612,9 @@
 
                     /*
                      * =================================================
-                     * OBTENER CÓDIGO
+                     * OBTENER CÓDIGO DESDE "text"
                      * =================================================
                      */
-
 
                     const codigo =
 
@@ -1473,12 +1635,8 @@
 
 
                     /*
-                     * fid NO SE UTILIZA.
-                     *
-                     * Solamente lo mostramos en consola
-                     * durante las pruebas.
+                     * fid NO SE UTILIZA
                      */
-
 
                     console.log(
 
@@ -1497,7 +1655,6 @@
                      * BUSCAR EN TODAS LAS PLANILLAS
                      * =================================================
                      */
-
 
                     const datos =
                         buscarReja(
@@ -1521,7 +1678,6 @@
                      * POSICIONAR POPUP
                      * =================================================
                      */
-
 
                     if (
                         typeof popup !==
@@ -1567,19 +1723,19 @@
 
         /*
          * =====================================================
-         * INICIAR
+         * INICIAR CARGA DE PLANILLAS
          * =====================================================
          */
-
 
         cargarTodasLasPlanillas();
 
 
 
         /*
-         * Esperar a que QGIS2WEB cree el mapa.
+         * =====================================================
+         * ESPERAR A QUE QGIS2WEB CREE EL MAPA
+         * =====================================================
          */
-
 
         let intentosMapa = 0;
 
