@@ -133,7 +133,6 @@
 
         <!-- ========================================================= -->
         <!-- PAPAPARSE -->
-        <!-- IMPORTANTE: tiene que cargarse ANTES de usar Papa.parse -->
         <!-- ========================================================= -->
 
         <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.3/papaparse.min.js"></script>
@@ -168,15 +167,21 @@
 
 
         /*
-         * La planilla se lee completa de A:W.
+         * La planilla se lee de A:W.
          *
-         * IMPORTANTE:
+         * Estructura real:
          *
-         * La relación se hace EXCLUSIVAMENTE:
+         * FILA 1 → se ignora
+         * FILA 2 → encabezados
+         * FILA 3 → primer registro
+         * FILA 4 → segundo registro
+         * etc.
          *
-         *       QGIS "text"
-         *             ↓
-         *       Google Sheets columna A
+         * Relación:
+         *
+         * QGIS "text"
+         *       ↓
+         * Google Sheets columna A
          *
          * El campo "fid" NO se utiliza.
          */
@@ -189,15 +194,8 @@
 
         /*
          * ============================================================
-         * NORMALIZACIÓN DEL CÓDIGO
+         * NORMALIZAR CÓDIGO
          * ============================================================
-         *
-         * No modificamos el contenido del código.
-         *
-         * Solamente:
-         * - quitamos espacios al principio/final
-         * - unificamos Unicode
-         * - pasamos a mayúsculas
          */
 
         function normalizarCodigo(valor) {
@@ -217,9 +215,6 @@
          * ============================================================
          * ESCAPE HTML
          * ============================================================
-         *
-         * Evita que un contenido de Google Sheets pueda interpretarse
-         * como HTML dentro del popup.
          */
 
         function escapeHtml(valor) {
@@ -251,7 +246,7 @@
 
 
             /*
-             * Comprobación de PapaParse
+             * Comprobar que PapaParse esté disponible
              */
 
             if (typeof Papa === 'undefined') {
@@ -299,7 +294,15 @@
                             const filas = resultado.data;
 
 
-                            if (!filas || filas.length < 2) {
+                            /*
+                             * Necesitamos como mínimo:
+                             *
+                             * fila 1 → algo
+                             * fila 2 → encabezados
+                             * fila 3 → datos
+                             */
+
+                            if (!filas || filas.length < 3) {
 
                                 console.error(
                                     'La planilla no contiene datos suficientes.'
@@ -310,23 +313,47 @@
 
 
                             /*
-                             * Primera fila = encabezados
+                             * =================================================
+                             * FILA 2 = ENCABEZADOS
+                             * =================================================
+                             *
+                             * En JavaScript:
+                             *
+                             * fila 1 → índice 0
+                             * fila 2 → índice 1
                              */
 
-                            const encabezados = filas[0];
+                            const encabezados = filas[1];
+
+
+                            console.log(
+                                'Encabezados detectados:',
+                                encabezados
+                            );
 
 
                             /*
-                             * Filas de datos.
+                             * =================================================
+                             * FILA 3 EN ADELANTE = DATOS
+                             * =================================================
                              *
-                             * Solamente A:W
+                             * Por eso usamos slice(2).
                              */
 
                             datosPlanilla =
-                                filas.slice(1).map(function(fila) {
+                                filas.slice(2).map(function(fila) {
 
                                     let objeto = {};
 
+
+                                    /*
+                                     * A:W
+                                     *
+                                     * A = 0
+                                     * B = 1
+                                     * ...
+                                     * W = 22
+                                     */
 
                                     for (let i = 0; i <= 22; i++) {
 
@@ -343,10 +370,14 @@
 
 
                                     /*
-                                     * IMPORTANTE:
+                                     * =================================================
+                                     * COLUMNA A
+                                     * =================================================
                                      *
-                                     * Guardamos explícitamente
-                                     * la columna A.
+                                     * Guardamos explícitamente el código.
+                                     *
+                                     * Este es el valor que después se comparará
+                                     * contra feature.get('text').
                                      */
 
                                     objeto.__codigo =
@@ -362,15 +393,14 @@
 
                             /*
                              * =================================================
-                             * CREAR ÍNDICE
+                             * CREAR ÍNDICE DE REJAS
                              * =================================================
                              *
-                             * CLAVE:
+                             * Ejemplo:
                              *
-                             * indiceRejas["12RP302"]
+                             * indiceRejas["12RP362"]
                              *
-                             * devuelve la fila de Google Sheets cuyo
-                             * valor de columna A es "12RP302".
+                             * devuelve la fila correspondiente de Sheets.
                              */
 
                             indiceRejas = {};
@@ -392,6 +422,12 @@
                             });
 
 
+                            /*
+                             * =================================================
+                             * INFORMACIÓN DE DEPURACIÓN
+                             * =================================================
+                             */
+
                             console.log(
                                 'Google Sheets cargado correctamente.'
                             );
@@ -410,14 +446,21 @@
 
 
                             /*
-                             * Prueba específica del código que estamos
-                             * utilizando.
+                             * Prueba específica.
                              */
 
                             console.log(
                                 'Prueba 12RP302:',
                                 indiceRejas[
                                     normalizarCodigo('12RP302')
+                                ]
+                            );
+
+
+                            console.log(
+                                'Prueba 12RP362:',
+                                indiceRejas[
+                                    normalizarCodigo('12RP362')
                                 ]
                             );
 
@@ -512,12 +555,9 @@
              * ENCONTRADA
              * --------------------------------------------------------
              *
-             * Por ahora NO mostramos A:W.
+             * Todavía no mostramos A:W.
              *
-             * Solamente confirmamos que la relación funciona.
-             *
-             * Después podemos elegir exactamente qué columnas
-             * queremos mostrar.
+             * Primero confirmamos que la relación funciona.
              */
 
             popupContent.innerHTML =
@@ -601,8 +641,8 @@
 
 
                         /*
-                         * Si no podemos identificar la capa por
-                         * título, tomamos la primera geometría.
+                         * Si no podemos identificar la capa por título,
+                         * tomamos la primera geometría.
                          */
 
                         if (!featureEncontrada) {
@@ -622,14 +662,13 @@
 
                 /*
                  * =========================================================
-                 * MUY IMPORTANTE
+                 * CAMPO UTILIZADO: "text"
                  * =========================================================
                  *
-                 * El código se obtiene EXCLUSIVAMENTE del campo:
+                 * IMPORTANTE:
                  *
-                 *                    text
-                 *
-                 * NO utilizamos fid.
+                 * fid → ignorado
+                 * text → utilizado
                  */
 
                 const codigo =
@@ -673,8 +712,7 @@
                 /*
                  * =========================================================
                  * BUSCAR EN COLUMNA A
-                 * =========================================================
-                 */
+                 * ========================================================= */
 
                 const fila =
                     buscarReja(codigoTexto);
@@ -693,8 +731,8 @@
 
 
                 /*
-                 * Esperamos unos milisegundos para que qgis2web
-                 * termine su propio popup.
+                 * Esperamos un instante para que qgis2web termine
+                 * de mostrar su popup original.
                  */
 
                 setTimeout(function() {
@@ -724,14 +762,14 @@
 
 
         /*
-         * Primero cargamos la planilla.
+         * Cargar planilla.
          */
 
         cargarPlanilla();
 
 
         /*
-         * Esperamos a que qgis2web haya creado el mapa.
+         * Esperar a que qgis2web haya creado el mapa.
          */
 
         setTimeout(function() {
